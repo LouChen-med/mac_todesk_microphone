@@ -1,0 +1,21 @@
+# Local investigations, downloaded installers and extracted vendor files.
+/tmp/
+/downloads/
+/dist/
+/build/
+
+# Rebuilt executables and machine-specific audio-device snapshots.
+/audio-tools/
+**/audio-before.json
+*.pkg
+*.dmg
+*.exe
+*.zip
+*.xlog
+*.log
+
+# Local system/editor files.
+.DS_Store
+*.swp
+*.swo
+*~
