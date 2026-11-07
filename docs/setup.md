@@ -2,6 +2,8 @@
 
 本页面向“Windows 作为主控，Mac 作为被控，Windows 麦克风用于 Mac 豆包输入法”的场景。Mac 本机回环已验证，跨机链路仍需实际讲话和豆包识别验收。
 
+当前 Mac 无人值守；ToDesk 协作需要在 Mac 端完成确认，用户无法完成该步骤，所以它不作为本工作流的默认传输方案。用户最终要求只用 ToDesk，不能直接连接就停止；独立的 SonoBus 或浏览器音频保留为[未实施的候选](alternatives.md)。排查结束已恢复普通播放输出。下文保留配置步骤供以后主动复现。
+
 ## 配置前记录
 
 1. 保留 ToDesk 远控连接，先不要重启 Mac 或结束 ToDesk 进程。
@@ -73,7 +75,7 @@ audio_route restore [--state PATH]
 
 旧脚本中的 `--blackhole-input --blackhole-output`、`--restore-output` 等标志保留兼容；新操作优先使用上表的命令。
 
-## ToDesk 协作语音配置
+## ToDesk 协作语音配置（需能完成 Mac 确认）
 
 1. Windows 连接 Mac 后，在悬浮球或顶部工具栏点击“互动 → 协作成员”，邀请被控 Mac 进入协作模式。
 2. Mac 处理加入提示。Windows 成员开启自己的实体麦克风；Mac 成员关闭自己的麦克风。
@@ -84,6 +86,47 @@ audio_route restore [--state PATH]
 新版入口和语音功能合并见 [ToDesk 协作帮助](https://todesk.com/helpcenter/solo-461.html)。找不到入口时，核对 [协作功能权益与客户端要求](https://www.todesk.com/special_multi-usercollaboration.html)。账号缺少入口时可按[替代方案](alternatives.md)测试独立音频传输。
 
 Mac 协作麦克风必须保持关闭，因为它的默认输入是 BlackHole；开启会把收到的远端声音再次发送出去。Windows 宜使用耳机，减少扬声器声音重新被实体麦克风采集。
+
+本次已确认协作入口可进入、Windows 麦克风已开启，但被控 Mac 仍有待确认步骤，无法满足当前无人值守操作。没有证据表明这一操作流程可跳过，也没有将其改成自动同意。
+
+## 输入法与 VS Code
+
+本次另一个现象是：按住左 Option，在 Mac 文本编辑中能出现豆包录音框，在 VS Code 中不出现。这与“是否有音频进入 BlackHole”是两项独立检查；录音框出现也不表示 Windows 语音已经接通。
+
+只读检查结果：
+
+- 豆包的左 Option 快捷键已配置，不能据此判定快捷键配置错误。
+- `isGloableASRShortcutEnable=false`，当前没有启用全局语音快捷键。
+- 系统 `TextInputGlobalPropertyPerContextInput=1`，按输入上下文记忆输入法；随焦点切换，观察到了 ABC 与豆包交替成为当前输入法。
+- VS Code 未发现与此相关的自定义键位覆盖。
+
+先在 VS Code 中点击实际要输入的位置：编辑器正文、集成终端、扩展聊天框可能分别处于不同输入上下文。保持该输入框聚焦，从 Mac 菜单栏选择“豆包输入法”，再按左 Option，先确认能否出现录音界面。若需要跨输入法使用语音，在豆包自身设置中查找并启用其支持的全局语音功能，再分别验证目标输入框；不直接编辑应用的 MMKV 数据文件。
+
+仓库提供输入法工具，用于检查和切换系统已经启用的输入法：
+
+```text
+input_source status
+input_source list
+input_source select-doubao [--state PATH]
+input_source restore [--state PATH]
+```
+
+```sh
+./scripts/build.sh
+./audio-tools/input_source status
+./audio-tools/input_source list
+./audio-tools/input_source select-doubao
+```
+
+也可以双击根目录的[选择豆包输入法.command](../选择豆包输入法.command)。工具在首次切换前保存 `audio-tools/input-before.json`，不覆盖已有快照；当前已经是豆包时不重复切换；豆包尚未在系统中启用时明确失败，不强制添加。原输入法仍已启用且可选择时，可运行：
+
+```sh
+./audio-tools/input_source restore
+```
+
+`--state PATH` 可指定另一份本机输入法快照。它与音频路由的 `audio-before.json` 是两类文件，不能混用。
+
+**工具选择的是当前输入上下文。** 从 Terminal 运行命令或双击 `.command` 会涉及 Terminal 的焦点，不保证同时改变 VS Code 内另一个上下文。因此仍需回到 VS Code 的目标输入框核对菜单栏输入法，不能把脚本成功退出当作 VS Code 语音已修好。
 
 ## 四层验收
 
@@ -125,13 +168,15 @@ callbacks=283
 
 `--meter-only` 只从 BlackHole 输入统计电平，不写入测试音。`--duration` 支持 `1` 至 `120` 秒；未指定时合成测试默认 `3` 秒，只读电平默认 `10` 秒。
 
-电平应随讲话改变。本次到记录截止时没有观察到 Windows 语音进入，曾得到 `peak=0`。只有这一层通过，才能说 Windows 麦克风已传入 Mac。
+电平应随讲话改变。本次后续使用整理后的工具检测 15 秒，`inputRate=48000`、`inputChannels=2`、`invalidBuffers=0`，但 `peak=0.000000`、`rms=0.000000`。在该采样窗口中没有检测到声音。只有这一层通过，才能说 Windows 麦克风已传入 Mac。
 
 ### 第四层：豆包实际识别
 
 Mac 的“系统偏好设置 → 安全性与隐私 → 隐私 → 麦克风”（新系统为“系统设置 → 隐私与安全性 → 麦克风”）中允许豆包输入法访问麦克风。若有多个豆包相关进程，以系统实际申请权限的应用为准。
 
-退出正在运行的豆包语音录制，再重新进入文本框发起语音输入。说出测试句并确认文字与远端讲话一致，随后静默，确认不会误录 Mac 的播放声音。必要时重启豆包输入法以重新读取设备。
+退出正在运行的豆包语音录制，在实际目标输入框聚焦后确认当前输入法为豆包，再按已配置的左 Option 或所选语音快捷键。先确认录音界面出现，再说出测试句，确认文字与远端讲话一致；随后静默，确认不会误录 Mac 的播放声音。
+
+若文本编辑能出现录音框而 VS Code 不能，先按[输入法与 VS Code](#输入法与-vs-code)核对当前输入上下文。若两者都能出现录音框但没有声音，回到第三层检查。界面触发、跨机电平和最终识别必须分别验收。
 
 没有文字但第三层电平正常时，排查豆包的麦克风权限、选定设备、语音快捷键和应用自身状态。不要把此时的问题重新归因于“系统没有输入设备”。
 

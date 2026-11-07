@@ -7,6 +7,7 @@
 # Rebuilt executables and machine-specific audio-device snapshots.
 /audio-tools/
 **/audio-before.json
+**/input-before.json
 *.pkg
 *.dmg
 *.exe

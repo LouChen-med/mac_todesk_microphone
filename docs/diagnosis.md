@@ -45,6 +45,36 @@ Windows 端未找到旧的“语音通话”入口。查阅更新于 2026-10-27 
 
 用户确认开启协作麦克风后，使用整理后的工具检测 15 秒，得到 `inputRate=48000`、`inputChannels=2`、`invalidBuffers=0`、`peak=0.000000`、`rms=0.000000`：该采样窗口中 BlackHole 没有收到可检测信号。用户反馈按住左 Option 仍不能输入；需要分开确认“是否出现豆包录音界面”和“Windows 讲话是否送达 BlackHole”，不能只改快捷键就认定声音路径已经接通。
 
+## 后续确认：无人值守限制
+
+用户进一步说明，Windows 可进入协作且麦克风已开启，但被控 Mac 无人值守，无法完成 Mac 侧的“确定”操作。因此协作语音路径目前不适合作为该工作流的默认方案。用户最终选择只使用 ToDesk，无法直接连接时停止排查，因此没有配置或连接 SonoBus、浏览器音频等独立通道。
+
+这补充的是工作流限制，不改变 BlackHole 本机回环已通过的结果，也不代表已经证明所有 ToDesk 协作场景均不可用。
+
+## 后续确认：文本编辑可触发，VS Code 不触发
+
+用户确认左 Option 在文本编辑中能出现豆包录音框，在 VS Code 的 AI 助手／扩展聊天输入框中不出现。只读检查发现：
+
+| 项目 | 结果 | 判断 |
+| --- | --- | --- |
+| 豆包语音快捷键 | 左 Option 已配置 | 无证据表明快捷键设置错误 |
+| 全局语音开关 | `isGloableASRShortcutEnable=false` | 当前没有启用全局语音触发 |
+| 按上下文记忆输入法 | `TextInputGlobalPropertyPerContextInput=1` | 不同输入上下文可能保留不同输入法 |
+| 实时输入法状态 | 随焦点变化观察到 ABC／豆包切换 | 需要在 VS Code 的目标输入框核对输入法 |
+| VS Code 自定义键位 | 未发现相关覆盖 | 不应先修改 VS Code 键位来解释该现象 |
+
+这些证据指向先检查目标输入框的输入法上下文，并没有证明 VS Code 的触发问题已修好。操作时在 VS Code 编辑器、终端或扩展输入框内聚焦，再从菜单栏选择豆包，或通过豆包支持的全局语音设置验证跨输入法触发。未直接修改豆包的 MMKV 数据。
+
+新增 `input_source.swift` 使用系统输入法接口检查、选择和恢复已启用的输入法，切换前保留本机快照。它不能保证在 Terminal 中选择豆包后，VS Code 另一个输入上下文也同步改变。详细操作见[输入法与 VS Code](setup.md#输入法与-vs-code)。
+
+激活 VS Code 后再查询时，当前源已是豆包，工具因此没有执行切换。这个结果没有证明扩展聊天框能够触发录音，也不能把上下文输入法设置视为已确认的唯一原因。没有修改 VS Code 键位、豆包热键或全局语音开关。
+
+## 排查结束状态
+
+按用户停止替代传声配置的要求，执行了 `audio_route restore-output`。原 ToDesk 输出设备当时不可用，工具按快照回退到原系统输出 HDMI；默认输入仍为 BlackHole，系统提示音输出保持 HDMI。驱动未卸载，远控会话未重启，没有安装或连接额外传声应用。
+
+完整的 Windows 语音 → Mac → 豆包识别未跑通；VS Code 扩展聊天框的语音触发也未验证修复。
+
 ## 按现象排查
 
 | 现象 | 优先检查 |
@@ -54,6 +84,8 @@ Windows 端未找到旧的“语音通话”入口。查阅更新于 2026-10-27 
 | 合成回环失败 | BlackHole 是否 `alive`、输入输出通道、驱动安装和测试程序错误码 |
 | 合成回环通过，Windows 讲话时电平为零 | Windows 实体麦克风、ToDesk 协作是否加入、发言是否静音、Mac 播放设备 |
 | 找不到“语音通话” | 查“互动 → 协作成员”；核对版本和协作权益 |
+| 协作要求 Mac 确认，但 Mac 无人值守 | 当前工作流改为待验证的独立声音通道；不假定协作已接通 |
+| 左 Option 在文本编辑有录音框、VS Code 没有 | 在 VS Code 实际目标输入框聚焦后核对是否为豆包；检查全局语音设置 |
 | 电平随讲话变化，豆包不出字 | 豆包麦克风权限、设备选择、快捷键及应用状态 |
 | 豆包录入音乐、视频或提示声 | Mac 所有普通输出均送入 BlackHole；暂停其他音源或改用独立应用输出 |
 | 回声或声音循环 | 关闭 Mac 的协作麦克风和发送；Windows 使用耳机 |
@@ -66,6 +98,8 @@ Windows 端未找到旧的“语音通话”入口。查阅更新于 2026-10-27 
 ./audio-tools/audio_diag
 ./audio-tools/audio_route status
 ./audio-tools/audio_route list
+./audio-tools/input_source status
+./audio-tools/input_source list
 ./audio-tools/blackhole_loopback_check --meter-only --duration 15
 ```
 

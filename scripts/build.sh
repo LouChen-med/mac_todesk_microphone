@@ -12,7 +12,7 @@ fi
 
 # Native architecture, with macOS 12 as the minimum supported OS.
 export MACOSX_DEPLOYMENT_TARGET=12.0
-for source in audio_route audio_diag window_list; do
+for source in audio_route audio_diag window_list input_source; do
     /usr/bin/xcrun swiftc -O "$repo_root/src/$source.swift" -o "$output_dir/$source"
 done
 /usr/bin/xcrun clang -std=c11 -O2 -Wall -Wextra -Werror \

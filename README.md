@@ -1,8 +1,12 @@
-# Windows 麦克风 → ToDesk → Mac → 豆包输入法
+# Windows 麦克风 → Mac → 豆包输入法（ToDesk 远控）
 
-记录一台无可用物理麦克风的 Mac，如何通过 BlackHole 虚拟声卡接收远端音频，以及这次排查用到的配置、源码和恢复方法。
+记录通过 ToDesk 远控一台无可用物理麦克风的 Mac 时，如何用 BlackHole 虚拟声卡接收远端音频，以及这次排查用到的配置、源码和恢复方法。
 
-**当前完成的是 Mac 虚拟输入设备安装与本机回环验证。Windows 麦克风传到 Mac、再由豆包识别的完整链路尚未验证成功。** BlackHole 负责 Mac 内部音频路由；跨电脑传输仍需 ToDesk 协作语音或其他音频工具。
+**当前完成的是 Mac 虚拟输入设备安装与本机回环验证。Windows 麦克风传到 Mac、再由豆包识别的完整链路尚未验证成功。** BlackHole 负责 Mac 内部音频路由；跨电脑传输仍需独立的声音通道。
+
+后续已确认能进入 ToDesk 协作、Windows 麦克风也已开启，但该流程要求在被控 Mac 确认，当前无人值守工作流无法完成这一步。**协作语音不作为本工作流的默认推荐。** 用户最终选择只使用 ToDesk，不能直接接入就停止，因此没有部署 SonoBus 或浏览器传声。仓库保留候选方案供参考。
+
+结束排查时已恢复 Mac 普通声音播放至原系统输出 HDMI，不再把全部播放送进 BlackHole；BlackHole 驱动及默认输入保留。下方启用命令用于日后主动复现，整理文档不会自动执行它们。
 
 ## 为什么 Mac 显示“找不到输入设备”
 
@@ -12,7 +16,7 @@ ToDesk 官方截至 2026-11-07 的说明将“麦克风映射”限定为 **Wind
 
 ```mermaid
 flowchart LR
-    A[Windows 实体麦克风] --> B[ToDesk 协作语音：待验证]
+    A[Windows 实体麦克风] --> B[独立音频传输：待选择与验证]
     B --> C[Mac 默认输出 BlackHole 2ch]
     C --> D[Mac 默认输入 BlackHole 2ch]
     D --> E[豆包输入法：待验证]
@@ -25,11 +29,13 @@ flowchart LR
 | 项目 | 结果 |
 | --- | --- |
 | BlackHole 2ch 0.7.1 安装、包签名及驱动签名检查 | 已完成 |
-| BlackHole 作为 Mac 默认输入、默认输出 | 已完成 |
+| BlackHole 作为 Mac 默认输入、默认输出 | 配置和本机测试已完成；结束时已恢复普通输出，保留 BlackHole 输入 |
 | 合成测试音 → BlackHole 输出 → BlackHole 输入 | 已通过，峰值 `0.100000`，RMS `0.070459` |
-| Windows 麦克风 → ToDesk → BlackHole | 尚未通过；此前待测时电平为 `0` |
+| Windows 麦克风 → ToDesk → BlackHole | 尚未通过；15 秒检测电平为 `0`，协作还受 Mac 确认限制 |
 | 豆包识别 Windows 语音 | 尚未验证 |
 | SonoBus、VDO.Ninja 替代传输 | 候选方案，未完成跨机验证 |
+| 左 Option 语音触发 | 文本编辑可出现录音框，VS Code 的 AI 扩展聊天框未出现；快捷键已配置，问题未确认修复 |
+| 输入法随焦点变化 | 已观察到 ABC／豆包按上下文切换，需要在目标输入框选择豆包 |
 
 ## 快速配置
 
@@ -68,7 +74,11 @@ cd mac_todesk_microphone
 
 也可以在完成编译后双击 **[开启远程语音输入.command](开启远程语音输入.command)**。
 
-### 3. Windows 打开 ToDesk 协作麦克风
+### 3. 建立 Windows 到 Mac 的声音通道
+
+本次无人值守场景若要继续，需要另选并验证 [SonoBus 或浏览器音频方案](docs/alternatives.md)。用户已选择停止这一步，以下仅为复现说明。ToDesk 继续承担桌面远控。
+
+以下协作路径仅保留供能完成 Mac 确认的场景参考；不能把“Windows 麦克风已开启”当作声音已到达 Mac 的证明。
 
 在 Windows 的远程会话中，打开：
 
@@ -99,6 +109,8 @@ Windows 还需在系统麦克风设置中允许 ToDesk 使用所选实体麦克�
 
 最后打开 Mac 文本框，启动豆包语音输入，说一句有辨识度的测试句，确认出现对应文字。以这一步作为完整链路通过的标准。
 
+如果左 Option 在文本编辑能显示录音框、在 VS Code 中不显示，先在 **VS Code 实际目标输入框**（编辑器、终端或扩展输入框）聚焦，再从 Mac 菜单栏选择豆包输入法。本次左 Option 配置正确，但全局语音开关为关闭状态，且系统按输入上下文记忆 ABC／豆包。详细排查见[输入法与 VS Code](docs/setup.md#输入法与-vs-code)。
+
 ### 5. 用完恢复声音播放
 
 ```sh
@@ -117,10 +129,11 @@ Windows 还需在系统麦克风设置中允许 ToDesk 使用所选实体麦克�
 | `src/audio_diag.swift` | CoreAudio 只读诊断，查看通道及默认设备能力 |
 | `src/blackhole_loopback_check.c` | BlackHole 合成回环测试、只读电平检查 |
 | `src/window_list.swift` | 只读窗口列表，用于定位系统或应用界面 |
+| `src/input_source.swift` | 检查已启用输入法，保存原输入法后选择豆包，或恢复 |
 | `scripts/build.sh` | 编译源码至本机 `audio-tools/` |
 | `scripts/install-blackhole.sh` | 校验、暂存并通过系统认证安装 BlackHole |
 | `scripts/install-blackhole.applescript` | 请求原生管理员认证，执行安装和音频服务刷新 |
-| 两个 `.command` 文件 | 日常启用和恢复入口 |
+| 三个 `.command` 文件 | 日常启用音频、恢复播放和选择豆包入口 |
 | `docs/` | 配置、诊断过程、候选方案及下载链接 |
 | `AGENTS.md` | 后续维护、测试和发布约定 |
 
@@ -131,7 +144,13 @@ Windows 还需在系统麦克风设置中允许 ToDesk 使用所选实体麦克�
 ./audio-tools/audio_route status
 ./audio-tools/audio_diag
 ./audio-tools/window_list
+./audio-tools/input_source status
+./audio-tools/input_source list
 ```
+
+需要切换当前输入上下文时，可执行 `./audio-tools/input_source select-doubao`，或双击[选择豆包输入法.command](选择豆包输入法.command)。它只选择系统已启用的豆包，不强制添加输入法；首次选择前保存 `audio-tools/input-before.json`，已有快照不覆盖。执行 `./audio-tools/input_source restore` 可恢复已启用的原输入法。
+
+从 Terminal 切换输入法不能保证 VS Code 的另一个输入上下文也随之改变。在 VS Code 内聚焦目标输入框后从菜单栏选择，才是这一问题的直接检查方式。输入法快照同样只保存在本机。
 
 详细说明：
 

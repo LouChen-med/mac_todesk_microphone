@@ -2,12 +2,14 @@
 
 BlackHole 是 Mac 内部的虚拟音频线，不负责把 Windows 麦克风通过网络传过来。选择传输方案时，仍使用“Mac 电平随 Windows 讲话变化 → 豆包识别测试句”作为验收标准。
 
+本次用户的 Mac 无人值守，无法完成 ToDesk 协作要求的被控端确认。用户最终要求只用 ToDesk，不能直接连接就停止，因此没有部署独立传声工具。以下保留 SonoBus 与浏览器音频的候选配置，不代表已实施或用户仍打算继续。
+
 ## 方案比较
 
 | 方案 | 声音路径 | 本次状态 | 适用条件 |
 | --- | --- | --- | --- |
 | ToDesk 直接麦克风映射 | Windows 麦克风 → ToDesk 虚拟输入 | 对被控 Mac 不适用 | 官方目前限定 Windows 被控端 |
-| ToDesk 协作语音 + BlackHole | Windows 麦克风 → 协作语音 → Mac 播放 → BlackHole | Mac 回环通过，跨机待验证 | 两端有协作入口及相应权益 |
+| ToDesk 协作语音 + BlackHole | Windows 麦克风 → 协作语音 → Mac 播放 → BlackHole | Windows 麦克风已开，跨机未通过；不适合当前无人值守确认流程 | 两端有协作入口及权益，且能完成 Mac 确认 |
 | SonoBus + BlackHole | Windows 麦克风 → SonoBus → Mac 的 BlackHole 输出 | 候选；安装包已检查，未安装连接 | 愿意增加音频传输软件，且接受其加密限制 |
 | VDO.Ninja + BlackHole | Windows 浏览器麦克风 → WebRTC → Mac 浏览器播放 → BlackHole | 候选，未测试网络和浏览器兼容性 | 两端浏览器可用且网络允许连接 |
 | 聚合设备包装 ToDesk 驱动 | 尝试把 ToDesk 输入通道包装为普通输入 | 仅研究，未实施 | 需另做 CoreAudio 验证，不保证能接收远端麦克风 |
@@ -16,7 +18,7 @@ ToDesk 映射能力依据[官方映射说明](https://www.todesk.com/helpcenter/
 
 ## A. ToDesk 协作语音 + BlackHole
 
-这是现有 ToDesk 工作流的优先验证路径。
+这一路径保留供能完成 Mac 端确认的场景参考，不作为当前无人值守工作流的默认推荐。用户已确认能进入协作、Windows 麦克风已开启，但 Mac 端仍需确认，且 BlackHole 电平检测未通过。
 
 1. Mac 安装 BlackHole，并运行仓库的 `audio_route enable`。
 2. Windows 的 ToDesk 会话打开“悬浮球 → 互动 → 协作成员”，邀请 Mac 加入。
@@ -24,7 +26,7 @@ ToDesk 映射能力依据[官方映射说明](https://www.todesk.com/helpcenter/
 4. 用只读电平模式确认 Windows 讲话进入 BlackHole，然后验证豆包。
 5. 结束后执行 `audio_route restore-output`。
 
-完整步骤见[配置文档](setup.md)。语音入口已合并到[协作模式](https://todesk.com/helpcenter/solo-461.html)；入口缺失时核对[版本与权益](https://www.todesk.com/special_multi-usercollaboration.html)。本项目没有验证该账号的协作音频传输已经可用。
+完整步骤见[配置文档](setup.md)。语音入口已合并到[协作模式](https://todesk.com/helpcenter/solo-461.html)；入口缺失时核对[版本与权益](https://www.todesk.com/special_multi-usercollaboration.html)。本项目没有验证该账号的协作音频传输已经可用，也没有配置无人值守自动接听。
 
 ## B. SonoBus + BlackHole
 
